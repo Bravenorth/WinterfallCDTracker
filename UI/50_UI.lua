@@ -1,0 +1,111 @@
+-- UI/50_UI.lua
+-- Fenêtre, rows, rendering, ticker UI
+
+local RCDT = RaidCDTracker
+
+-- Fenêtre principale
+RCDT.ui = CreateFrame("Frame", "RaidCDTrackerUIFrame", UIParent)
+RCDT.ui:SetSize(320, 400)
+RCDT.ui:SetPoint("CENTER")
+RCDT.ui:SetMovable(true) RCDT.ui:EnableMouse(true)
+RCDT.ui:RegisterForDrag("LeftButton")
+RCDT.ui:SetScript("OnDragStart", RCDT.ui.StartMoving)
+RCDT.ui:SetScript("OnDragStop", RCDT.ui.StopMovingOrSizing)
+
+-- Scrollable container
+local scroll = CreateFrame("ScrollFrame", nil, RCDT.ui, "UIPanelScrollFrameTemplate")
+scroll:SetAllPoints(RCDT.ui)
+if scroll.ScrollBar then scroll.ScrollBar:Hide(); scroll.ScrollBar.Show = function() end end
+local content = CreateFrame("Frame", nil, scroll) content:SetSize(1,1) scroll:SetScrollChild(content)
+
+-- Pool de rows
+local rowPool = {}
+local function CreateRow(i)
+    local row = CreateFrame("Frame", nil, content)
+    row:SetSize(300, 18)
+
+    -- Icône du sort
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(18,18) row.icon:SetPoint("LEFT",0,0)
+
+    -- Barre de progression
+    row.bar = CreateFrame("StatusBar", nil, row)
+    row.bar:SetSize(220,16) row.bar:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
+    row.bar:SetStatusBarTexture("Interface\\TARGETINGFRAME\\UI-StatusBar")
+    row.bar:SetMinMaxValues(0,1)
+
+    -- Texte du joueur (centre)
+    row.bar.playerText = row.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.bar.playerText:SetPoint("CENTER")
+
+    -- Timer (droite)
+    row.bar.timerText = row.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.bar.timerText:SetPoint("RIGHT", -2, 0)
+
+    -- Positionnement vertical
+    if i == 1 then row:SetPoint("TOPLEFT",0,0) else row:SetPoint("TOPLEFT", rowPool[i-1], "BOTTOMLEFT", 0, 0) end
+    rowPool[i] = row
+    return row
+end
+
+local function GetRow(i)
+    if not rowPool[i] then return CreateRow(i) end
+    rowPool[i]:Show()
+    return rowPool[i]
+end
+
+-- Couleurs (par statut)
+local STATUS_COLORS = { [1]={0,0.7,1}, [2]={1,0,0} }
+
+-- Mise à jour UI
+function RCDT.UpdateUI()
+    local now, i = GetTime(), 1
+    for player, spells in RCDT.spairs(RCDT.raidState, function(a,b)
+        return RCDT.ShortName(a) < RCDT.ShortName(b)
+    end) do
+        local class = RCDT.GetClassForPlayer(player)
+        local classColor = (class and RAID_CLASS_COLORS[class]) or { r=1, g=1, b=1 }
+
+        for spellID, data in RCDT.spairs(spells, function(a,b)
+            local na = GetSpellInfo(a) or ""
+            local nb = GetSpellInfo(b) or ""
+            return na < nb
+        end) do
+            local row = GetRow(i)
+            local _, _, spellIcon = GetSpellInfo(spellID)
+            local remain = (data.endTime and data.endTime > 0) and math.max(0, data.endTime - now) or 0
+
+            -- Progression
+            local frac
+            if data.status == RCDT.STATUS.Ready then
+                frac=1; row.bar.timerText:SetText("Ready")
+            elseif data.status == RCDT.STATUS.Active and (data.activeDur or 0) > 0 then
+                frac=(data.activeDur>0) and (remain/data.activeDur) or 0
+                row.bar.timerText:SetText(string.format("%.1fs", remain))
+            elseif data.status == RCDT.STATUS.OnCD and (data.totalCD or 0) > 0 then
+                frac=1-((data.totalCD>0) and (remain/data.totalCD) or 1)
+                if frac < 0 then frac = 0 end
+                row.bar.timerText:SetText(string.format("%.1fs", remain))
+            else
+                frac=0; row.bar.timerText:SetText("")
+            end
+
+            -- Couleur de la barre
+            local color = (data.status==RCDT.STATUS.Ready)
+                and {classColor.r, classColor.g, classColor.b}
+                or STATUS_COLORS[data.status] or {1,1,1}
+
+            -- Application row
+            row.icon:SetTexture(spellIcon or "Interface\\Icons\\INV_Misc_QuestionMark")
+            row.bar:SetValue(frac or 0)
+            row.bar:SetStatusBarColor(unpack(color))
+            row.bar.playerText:SetText(RCDT.ShortName(player))
+            i=i+1
+        end
+    end
+    for j=i,#rowPool do rowPool[j]:Hide() end
+    RCDT.ui:SetHeight((i-1) * (rowPool[1] and rowPool[1]:GetHeight() or 18) + 10)
+end
+
+-- Ticker UI
+C_Timer.NewTicker(RCDT.UI_TICK_SEC, RCDT.UpdateUI)

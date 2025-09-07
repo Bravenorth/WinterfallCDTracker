@@ -1,0 +1,20 @@
+## Interface: 50500
+## Title: RaidCDTracker
+## Author: Bravenorth
+## Version: 1.0.0
+## Notes: Suivi des cooldowns de raid (MoP Classic)
+## SavedVariables: RaidCDTrackerDB
+
+Core/00_Init.lua
+Core/10_Utils.lua
+
+Data/cd.lua
+
+Logic/20_Roster.lua
+Logic/30_Cooldown.lua
+Logic/40_Network.lua
+
+UI/50_UI.lua
+
+Core/90_Events.lua
+Core/99_Slash.lua
