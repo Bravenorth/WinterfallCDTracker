@@ -1,7 +1,8 @@
 -- UI/50_UI.lua
--- Fenêtre, rows, rendering, ticker UI
+-- Fenêtre, rows, rendering, ticker UI (avec filtres d’affichage uniquement)
 
 local RCDT = RaidCDTracker
+local UI_PERIOD = 0.10  -- tick fixe pour l'UI
 
 -- Fenêtre principale
 RCDT.ui = CreateFrame("Frame", "RaidCDTrackerUIFrame", UIParent)
@@ -10,7 +11,13 @@ RCDT.ui:SetPoint("CENTER")
 RCDT.ui:SetMovable(true) RCDT.ui:EnableMouse(true)
 RCDT.ui:RegisterForDrag("LeftButton")
 RCDT.ui:SetScript("OnDragStart", RCDT.ui.StartMoving)
-RCDT.ui:SetScript("OnDragStop", RCDT.ui.StopMovingOrSizing)
+RCDT.ui:SetScript("OnDragStop", function(self)
+  self:StopMovingOrSizing()
+  -- save pos
+  local point, _, relPoint, x, y = self:GetPoint()
+  RaidCDTracker.db = RaidCDTracker.db or RaidCDTracker.defaults  -- safety
+  RaidCDTracker.db.ui.pos = { point = point, relPoint = relPoint, x = x, y = y }
+end)
 
 -- Scrollable container
 local scroll = CreateFrame("ScrollFrame", nil, RCDT.ui, "UIPanelScrollFrameTemplate")
@@ -21,91 +28,105 @@ local content = CreateFrame("Frame", nil, scroll) content:SetSize(1,1) scroll:Se
 -- Pool de rows
 local rowPool = {}
 local function CreateRow(i)
-    local row = CreateFrame("Frame", nil, content)
-    row:SetSize(300, 18)
+  local row = CreateFrame("Frame", nil, content)
+  row:SetSize(300, 18)
 
-    -- Icône du sort
-    row.icon = row:CreateTexture(nil, "ARTWORK")
-    row.icon:SetSize(18,18) row.icon:SetPoint("LEFT",0,0)
+  row.icon = row:CreateTexture(nil, "ARTWORK")
+  row.icon:SetSize(18,18) row.icon:SetPoint("LEFT",0,0)
 
-    -- Barre de progression
-    row.bar = CreateFrame("StatusBar", nil, row)
-    row.bar:SetSize(220,16) row.bar:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
-    row.bar:SetStatusBarTexture("Interface\\TARGETINGFRAME\\UI-StatusBar")
-    row.bar:SetMinMaxValues(0,1)
+  row.bar = CreateFrame("StatusBar", nil, row)
+  row.bar:SetSize(220,16) row.bar:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
+  row.bar:SetStatusBarTexture("Interface\\TARGETINGFRAME\\UI-StatusBar")
+  row.bar:SetMinMaxValues(0,1)
 
-    -- Texte du joueur (centre)
-    row.bar.playerText = row.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.bar.playerText:SetPoint("CENTER")
+  row.bar.playerText = row.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.bar.playerText:SetPoint("CENTER")
 
-    -- Timer (droite)
-    row.bar.timerText = row.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.bar.timerText:SetPoint("RIGHT", -2, 0)
+  row.bar.timerText = row.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.bar.timerText:SetPoint("RIGHT", -2, 0)
 
-    -- Positionnement vertical
-    if i == 1 then row:SetPoint("TOPLEFT",0,0) else row:SetPoint("TOPLEFT", rowPool[i-1], "BOTTOMLEFT", 0, 0) end
-    rowPool[i] = row
-    return row
+  if i == 1 then row:SetPoint("TOPLEFT",0,0) else row:SetPoint("TOPLEFT", rowPool[i-1], "BOTTOMLEFT", 0, 0) end
+  rowPool[i] = row
+  return row
 end
 
 local function GetRow(i)
-    if not rowPool[i] then return CreateRow(i) end
-    rowPool[i]:Show()
-    return rowPool[i]
+  if not rowPool[i] then return CreateRow(i) end
+  rowPool[i]:Show()
+  return rowPool[i]
 end
 
 -- Couleurs (par statut)
 local STATUS_COLORS = { [1]={0,0.7,1}, [2]={1,0,0} }
 
--- Mise à jour UI
+-- Mise à jour UI (les filtres ne touchent QUE l’affichage)
 function RCDT.UpdateUI()
-    local now, i = GetTime(), 1
-    for player, spells in RCDT.spairs(RCDT.raidState, function(a,b)
-        return RCDT.ShortName(a) < RCDT.ShortName(b)
+  local now, i = GetTime(), 1
+
+  -- S’assure que les filtres existent (si le module options est chargé)
+  if RCDT.FiltersEnsureDefaults then RCDT.FiltersEnsureDefaults() end
+
+  for player, spells in RCDT.spairs(RCDT.raidState, function(a,b)
+    return RCDT.ShortName(a) < RCDT.ShortName(b)
+  end) do
+    local class = RCDT.GetClassForPlayer(player)
+    local classColor = (class and RAID_CLASS_COLORS[class]) or { r=1, g=1, b=1 }
+
+    for spellID, data in RCDT.spairs(spells, function(a,b)
+      local na = GetSpellInfo(a) or ""
+      local nb = GetSpellInfo(b) or ""
+      return na < nb
     end) do
-        local class = RCDT.GetClassForPlayer(player)
-        local classColor = (class and RAID_CLASS_COLORS[class]) or { r=1, g=1, b=1 }
+      -- Filtre d’affichage local (ne touche pas le réseau)
+      local show = true
+      if class and RCDT.IsSpellEnabledForClass then
+        show = RCDT.IsSpellEnabledForClass(class, spellID)
+      end
 
-        for spellID, data in RCDT.spairs(spells, function(a,b)
-            local na = GetSpellInfo(a) or ""
-            local nb = GetSpellInfo(b) or ""
-            return na < nb
-        end) do
-            local row = GetRow(i)
-            local _, _, spellIcon = GetSpellInfo(spellID)
-            local remain = (data.endTime and data.endTime > 0) and math.max(0, data.endTime - now) or 0
+      if show then
+        local row = GetRow(i)
+        local _, _, spellIcon = GetSpellInfo(spellID)
+        local remain = (data.endTime and data.endTime > 0) and math.max(0, data.endTime - now) or 0
 
-            -- Progression
-            local frac
-            if data.status == RCDT.STATUS.Ready then
-                frac=1; row.bar.timerText:SetText("Ready")
-            elseif data.status == RCDT.STATUS.Active and (data.activeDur or 0) > 0 then
-                frac=(data.activeDur>0) and (remain/data.activeDur) or 0
-                row.bar.timerText:SetText(string.format("%.1fs", remain))
-            elseif data.status == RCDT.STATUS.OnCD and (data.totalCD or 0) > 0 then
-                frac=1-((data.totalCD>0) and (remain/data.totalCD) or 1)
-                if frac < 0 then frac = 0 end
-                row.bar.timerText:SetText(string.format("%.1fs", remain))
-            else
-                frac=0; row.bar.timerText:SetText("")
-            end
-
-            -- Couleur de la barre
-            local color = (data.status==RCDT.STATUS.Ready)
-                and {classColor.r, classColor.g, classColor.b}
-                or STATUS_COLORS[data.status] or {1,1,1}
-
-            -- Application row
-            row.icon:SetTexture(spellIcon or "Interface\\Icons\\INV_Misc_QuestionMark")
-            row.bar:SetValue(frac or 0)
-            row.bar:SetStatusBarColor(unpack(color))
-            row.bar.playerText:SetText(RCDT.ShortName(player))
-            i=i+1
+        local frac
+        if data.status == RCDT.STATUS.Ready then
+          frac=1; row.bar.timerText:SetText("Ready")
+        elseif data.status == RCDT.STATUS.Active and (data.activeDur or 0) > 0 then
+          frac=(data.activeDur>0) and (remain/data.activeDur) or 0
+          if frac < 0 then frac = 0 elseif frac > 1 then frac = 1 end
+          row.bar.timerText:SetText(string.format("%.1fs", remain))
+        elseif data.status == RCDT.STATUS.OnCD and (data.totalCD or 0) > 0 then
+          frac=1-((data.totalCD>0) and (remain/data.totalCD) or 1)
+          if frac < 0 then frac = 0 elseif frac > 1 then frac = 1 end
+          row.bar.timerText:SetText(string.format("%.1fs", remain))
+        else
+          frac=0; row.bar.timerText:SetText("")
         end
+
+        local color = (data.status==RCDT.STATUS.Ready)
+          and {classColor.r, classColor.g, classColor.b}
+          or STATUS_COLORS[data.status] or {1,1,1}
+
+        row.icon:SetTexture(spellIcon or "Interface\\Icons\\INV_Misc_QuestionMark")
+        row.bar:SetValue(frac or 0)
+        row.bar:SetStatusBarColor(unpack(color))
+        row.bar.playerText:SetText(RCDT.ShortName(player))
+        i=i+1
+      end
     end
-    for j=i,#rowPool do rowPool[j]:Hide() end
-    RCDT.ui:SetHeight((i-1) * (rowPool[1] and rowPool[1]:GetHeight() or 18) + 10)
+  end
+
+  for j=i,#rowPool do rowPool[j]:Hide() end
+  RCDT.ui:SetHeight((i-1) * (rowPool[1] and rowPool[1]:GetHeight() or 18) + 10)
 end
 
--- Ticker UI
-C_Timer.NewTicker(RCDT.UI_TICK_SEC, RCDT.UpdateUI)
+-- Ticker UI : fixe + rétro-compat StartUITicker
+local function EnsureUITicker()
+  if not RCDT._uiTicker then
+    RCDT._uiTicker = C_Timer.NewTicker(UI_PERIOD, RCDT.UpdateUI)
+  end
+end
+EnsureUITicker()
+
+-- Rétro-compat : si du code appelle encore StartUITicker(sec), on ignore 'sec' et on s’assure juste du ticker.
+function RCDT.StartUITicker(_) EnsureUITicker() end

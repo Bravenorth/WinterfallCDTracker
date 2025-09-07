@@ -3,39 +3,135 @@
 
 local RCDT = RaidCDTracker
 
+-- string.trim helper (MoP/Classic)
+if not string.trim then
+    function string.trim(s) return (s:gsub("^%s*(.-)%s*$", "%1")) end
+end
+
+-- Ouvre le panneau d'options (focus AddOns > notre catégorie)
+local function OpenOptionsCategoryCompat()
+    -- Retail 10.x Settings API
+    if type(Settings) == "table" and Settings.OpenToCategory then
+        Settings.OpenToCategory("AddOns")
+        return
+    end
+
+    -- Classic API
+    if InCombatLockdown and InCombatLockdown() then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff5555[RaidCDTracker]|r Impossible d’ouvrir les options en combat.")
+        return
+    end
+
+    -- Charger l'UI options si besoin
+    if UIParentLoadAddOn and not IsAddOnLoaded("Blizzard_InterfaceOptions") then
+        pcall(UIParentLoadAddOn, "Blizzard_InterfaceOptions")
+    end
+
+    if not InterfaceOptionsFrame then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff5555[RaidCDTracker]|r InterfaceOptionsFrame indisponible.")
+        return
+    end
+
+    InterfaceOptionsFrame:Show()
+
+    -- try to switch to AddOns tab
+    if InterfaceOptionsFrameTab2 and InterfaceOptionsFrameTab2.Click then
+        InterfaceOptionsFrameTab2:Click()
+    end
+
+    local target = RCDT._optionsCategory or RCDT.optionsPanel or UIParent
+    local name   = (RCDT.optionsPanel and RCDT.optionsPanel.name) or (RCDT.ADDON or "RaidCDTracker")
+
+    local function openTo(x)
+        if InterfaceOptionsFrame_OpenToCategory then
+            InterfaceOptionsFrame_OpenToCategory(x)
+        end
+    end
+
+    -- Séquence robuste: plusieurs appels espacés (certains clients "perdent" la cible)
+    C_Timer.After(0.00,
+        function()
+            if InterfaceOptionsFrameTab2 and InterfaceOptionsFrameTab2.Click then InterfaceOptionsFrameTab2:Click() end; openTo(
+            target)
+        end)
+    C_Timer.After(0.10,
+        function()
+            if InterfaceOptionsFrameTab2 and InterfaceOptionsFrameTab2.Click then InterfaceOptionsFrameTab2:Click() end; openTo(
+            target)
+        end)
+    C_Timer.After(0.20,
+        function()
+            if InterfaceOptionsFrameTab2 and InterfaceOptionsFrameTab2.Click then InterfaceOptionsFrameTab2:Click() end; openTo(
+            name)
+        end)
+end
+
+-- S’assure que la DB est prête si ADDON_LOADED n'a pas encore initialisé
+local function EnsureDB()
+    if not RCDT.db and RCDT.DBInit then
+        RCDT.DBInit()
+        if RCDT.ApplyConfigUI then RCDT.ApplyConfigUI() end
+    end
+end
+
 SLASH_RAIDCD1 = "/raidcd"
 SlashCmdList["RAIDCD"] = function(msg)
     msg = (msg or ""):lower():trim()
 
     if msg == "dump" then
-        DEFAULT_CHAT_FRAME:AddMessage("|cffffff00--- "..RCDT.ADDON.." raidState dump ---|r")
-        if not next(RCDT.raidState) then DEFAULT_CHAT_FRAME:AddMessage("  (aucune donnée connue)") return end
-
-        for player, spells in RCDT.spairs(RCDT.raidState, function(a,b)
-            return RCDT.ShortName(a) < RCDT.ShortName(b)
-        end) do
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00"..RCDT.ShortName(player).."|r:")
-            for spellID,data in RCDT.spairs(spells, function(a,b)
-                local na = GetSpellInfo(a) or ""
-                local nb = GetSpellInfo(b) or ""
-                return na < nb
+        DEFAULT_CHAT_FRAME:AddMessage("|cffffff00--- " .. (RCDT.ADDON or "RaidCDTracker") .. " raidState dump ---|r")
+        if not next(RCDT.raidState) then
+            DEFAULT_CHAT_FRAME:AddMessage("  (aucune donnée connue)")
+            return
+        end
+        for player, spells in RCDT.spairs(RCDT.raidState, function(a, b) return RCDT.ShortName(a) < RCDT.ShortName(b) end) do
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00" .. RCDT.ShortName(player) .. "|r:")
+            for spellID, data in RCDT.spairs(spells, function(a, b)
+                local na = GetSpellInfo(a) or ""; local nb = GetSpellInfo(b) or ""; return na < nb
             end) do
-                local name = GetSpellInfo(spellID) or ("Spell:"..spellID)
-                local remain=(data.endTime and data.endTime>0) and math.max(0,data.endTime-GetTime()) or 0
-                local durText=(remain>0) and (" ("..string.format("%.1f",remain).."/"..(data.totalCD or 0).."s)") or ""
-                DEFAULT_CHAT_FRAME:AddMessage("  - "..name..": "..RCDT.STATUS_NAME[data.status]..durText)
+                local name = GetSpellInfo(spellID) or ("Spell:" .. spellID)
+                local remain = (data.endTime and data.endTime > 0) and math.max(0, data.endTime - GetTime()) or 0
+                local durText = (remain > 0) and (" (" .. string.format("%.1f", remain) .. "/" .. (data.totalCD or 0) .. "s)") or
+                ""
+                DEFAULT_CHAT_FRAME:AddMessage("  - " .. name .. ": " .. (RCDT.STATUS_NAME[data.status] or "?") .. durText)
             end
         end
         return
     end
 
-    -- aide
-    DEFAULT_CHAT_FRAME:AddMessage("|cffffff00Usage: /raidcd dump|r")
-end
-
--- petit helper si trim n’existe pas (MoP)
-if not string.trim then
-    function string.trim(s)
-        return (s:gsub("^%s*(.-)%s*$", "%1"))
+    if msg == "config" or msg == "options" then
+        if RCDT.ToggleConfig then
+            RCDT.ToggleConfig() -- ✅ ouvre le mini popup interne (fiable partout)
+        else
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff5555[RaidCDTracker]|r Config indisponible.")
+        end
+        return
     end
+
+
+    if msg == "debug on" then
+        EnsureDB(); if not RCDT.db then return end
+        RCDT.db.debug = true; RCDT.DEBUG_MODE = true
+        DEFAULT_CHAT_FRAME:AddMessage("|cff55ff55[RaidCDTracker]|r Debug: ON")
+        return
+    elseif msg == "debug off" then
+        EnsureDB(); if not RCDT.db then return end
+        RCDT.db.debug = false; RCDT.DEBUG_MODE = false
+        DEFAULT_CHAT_FRAME:AddMessage("|cff55ff55[RaidCDTracker]|r Debug: OFF")
+        return
+    end
+
+    if msg == "lock" then
+        EnsureDB(); if not RCDT.db then return end
+        RCDT.db.ui.locked = true; RCDT.ApplyConfigUI()
+        DEFAULT_CHAT_FRAME:AddMessage("|cff55ff55[RaidCDTracker]|r Fenêtre verrouillée.")
+        return
+    elseif msg == "unlock" then
+        EnsureDB(); if not RCDT.db then return end
+        RCDT.db.ui.locked = false; RCDT.ApplyConfigUI()
+        DEFAULT_CHAT_FRAME:AddMessage("|cff55ff55[RaidCDTracker]|r Fenêtre déverrouillée.")
+        return
+    end
+
+    DEFAULT_CHAT_FRAME:AddMessage("|cffffff00Usage:|r /raidcd dump | config | debug on|off | lock | unlock")
 end

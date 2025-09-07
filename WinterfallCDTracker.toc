@@ -7,6 +7,7 @@
 
 Core/00_Init.lua
 Core/10_Utils.lua
+Core/05_DB.lua                 
 
 Data/cd.lua
 
@@ -15,6 +16,7 @@ Logic/30_Cooldown.lua
 Logic/40_Network.lua
 
 UI/50_UI.lua
+UI/55_Options.lua              
 
 Core/90_Events.lua
 Core/99_Slash.lua
