@@ -3,7 +3,20 @@
 
 local RCDT = RaidCDTracker
 
--- Retourne la classe (token) d’un joueur, en comparant sur le ShortName
+-- Trouve une clé "canonique" dans raidState pour un nom donné
+-- Si une entrée existe déjà avec le même ShortName, on réutilise cette clé.
+function RCDT.CanonicalizePlayerKey(name)
+    if not name then return nil end
+    local short = RCDT.ShortName(name)
+    for k in pairs(RCDT.raidState) do
+        if RCDT.ShortName(k) == short then
+            return k
+        end
+    end
+    return name
+end
+
+-- Retourne la classe (token) d’un joueur en comparant sur le ShortName
 function RCDT.GetClassForPlayer(playerName)
     if not playerName then return nil end
     local want = RCDT.ShortName(playerName)
@@ -40,7 +53,7 @@ function RCDT.GetClassForPlayer(playerName)
     return nil
 end
 
--- Purge les entrées d’anciens membres (compare sur ShortName pour ignorer le suffixe de royaume)
+-- Purge les entrées d’anciens membres (compare sur ShortName)
 function RCDT.PruneRoster()
     local presentShort = {}
 
@@ -62,6 +75,7 @@ function RCDT.PruneRoster()
         if me then presentShort[RCDT.ShortName(me)] = true end
     end
 
+    -- Supprime ce qui n'est plus présent (en tolérant Nom/Nom-Royaume)
     for playerKey in pairs(RCDT.raidState) do
         if not presentShort[RCDT.ShortName(playerKey)] then
             RCDT.raidState[playerKey] = nil
@@ -74,7 +88,6 @@ function RCDT.IsTrackedFor(playerFull, spellID)
     local class = RCDT.GetClassForPlayer(playerFull)
     if not class then return false end
 
-    -- Récupération robuste du catalogue par classe (peu importe l’ordre de chargement)
     local byClass =
         (RCDT.TrackedByClass and RCDT.TrackedByClass())
         or RCDT.TRACKED_BY_CLASS
