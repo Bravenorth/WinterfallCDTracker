@@ -1,8 +1,37 @@
 -- UI/50_UI.lua
--- Fenêtre, rows, rendering, ticker UI (avec filtres d’affichage uniquement)
+-- Fenêtre, rows, rendering, ticker UI (avec filtres d’affichage + gating par contexte)
 
 local RCDT = RaidCDTracker
 local UI_PERIOD = 0.10  -- tick fixe pour l'UI
+
+-- Helpers display
+local function EnsureDisplayDefaults()
+  if not RCDT.db then return end
+  RCDT.db.display = RCDT.db.display or {}
+  local d = RCDT.db.display
+  if d.instance == nil then d.instance = true end
+  if d.raid     == nil then d.raid     = true end
+  if d.party    == nil then d.party    = true end
+  if d.solo     == nil then d.solo     = true end
+end
+
+local function GetDisplayContext()
+  local inInstance = IsInInstance()     -- bool (premier retour)
+  if inInstance then return "instance" end
+  if IsInRaid() then return "raid" end
+  if IsInGroup() then return "party" end
+  return "solo"
+end
+
+local function ShouldDisplayUI()
+  if not RCDT.db then return true end        -- avant DBInit: on affiche
+  EnsureDisplayDefaults()
+  local ctx = GetDisplayContext()
+  local d = RCDT.db.display
+  local v = d and d[ctx]
+  if v == nil then return true end           -- fallback sécurité
+  return v
+end
 
 -- Fenêtre principale
 RCDT.ui = CreateFrame("Frame", "RaidCDTrackerUIFrame", UIParent)
@@ -61,6 +90,15 @@ local STATUS_COLORS = { [1]={0,0.7,1}, [2]={1,0,0} }
 
 -- Mise à jour UI (les filtres ne touchent QUE l’affichage)
 function RCDT.UpdateUI()
+  -- Gating par contexte : si désactivé, on cache la frame et on stoppe ici
+  if not ShouldDisplayUI() then
+    for j=1,#rowPool do if rowPool[j] then rowPool[j]:Hide() end end
+    RCDT.ui:Hide()
+    return
+  else
+    RCDT.ui:Show()
+  end
+
   local now, i = GetTime(), 1
 
   -- S’assure que les filtres existent (si le module options est chargé)
@@ -128,5 +166,5 @@ local function EnsureUITicker()
 end
 EnsureUITicker()
 
--- Rétro-compat : si du code appelle encore StartUITicker(sec), on ignore 'sec' et on s’assure juste du ticker.
+-- Rétro-compat : si du code appelle encore StartUITicker(sec), on ignore 'sec'
 function RCDT.StartUITicker(_) EnsureUITicker() end
