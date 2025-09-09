@@ -91,7 +91,7 @@ local STATUS_COLORS = { [1]={0,0.7,1}, [2]={1,0,0} }
 -- Mise à jour UI (les filtres ne touchent QUE l’affichage)
 function RCDT.UpdateUI()
   -- Gating par contexte : si désactivé, on cache la frame et on stoppe ici
-  if not ShouldDisplayUI() then
+  if not (RCDT.ShouldDisplayUI and RCDT.ShouldDisplayUI()) then
     for j=1,#rowPool do if rowPool[j] then rowPool[j]:Hide() end end
     RCDT.ui:Hide()
     return
