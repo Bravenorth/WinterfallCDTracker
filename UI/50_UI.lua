@@ -76,6 +76,9 @@ local function CreateRow(i)
 
   if i == 1 then row:SetPoint("TOPLEFT",0,0) else row:SetPoint("TOPLEFT", rowPool[i-1], "BOTTOMLEFT", 0, 0) end
   rowPool[i] = row
+
+  -- Appliquer le style courant au row nouvellement créé
+  if RCDT.ApplyStyleToRow then RCDT.ApplyStyleToRow(row) end
   return row
 end
 
@@ -141,14 +144,29 @@ function RCDT.UpdateUI()
           frac=0; row.bar.timerText:SetText("")
         end
 
-        local color = (data.status==RCDT.STATUS.Ready)
-          and {classColor.r, classColor.g, classColor.b}
-          or STATUS_COLORS[data.status] or {1,1,1}
+        local style = (RCDT.GetStyle and RCDT.GetStyle()) or {}
+        local color
+        if data.status==RCDT.STATUS.Ready then
+          if style.useClassColorWhenReady ~= false then
+            color = {classColor.r, classColor.g, classColor.b}
+          else
+            local c = style.readyColor or {r=1,g=1,b=1}
+            color = {c.r or 1, c.g or 1, c.b or 1}
+          end
+        elseif data.status == RCDT.STATUS.Active then
+          local c = style.activeColor or {r=0,g=0.7,b=1}
+          color = {c.r or 0, c.g or 0.7, c.b or 1}
+        else -- OnCD
+          local c = style.onCDColor or {r=1,g=0,b=0}
+          color = {c.r or 1, c.g or 0, c.b or 0}
+        end
 
         row.icon:SetTexture(spellIcon or "Interface\\Icons\\INV_Misc_QuestionMark")
         row.bar:SetValue(frac or 0)
         row.bar:SetStatusBarColor(unpack(color))
         row.bar.playerText:SetText(RCDT.ShortName(player))
+        if style.showPlayer ~= nil then row.bar.playerText:SetShown(style.showPlayer) end
+        if style.showTimer  ~= nil then row.bar.timerText:SetShown(style.showTimer) end
         i=i+1
       end
     end
@@ -168,3 +186,64 @@ EnsureUITicker()
 
 -- Rétro-compat : si du code appelle encore StartUITicker(sec), on ignore 'sec'
 function RCDT.StartUITicker(_) EnsureUITicker() end
+
+-- Applique le style courant à un row existant
+function RCDT.ApplyStyleToRow(row)
+  local s = (RCDT.GetStyle and RCDT.GetStyle()) or {}
+  local rh = s.rowHeight or 18
+  local isz = s.iconSize or 18
+  local bw  = s.barWidth or 220
+
+  row:SetHeight(rh)
+  row.icon:SetSize(isz, isz)
+  row.bar:SetHeight(math.max(1, rh-2))
+  row.bar:SetWidth(bw)
+  if s.barTexture then row.bar:SetStatusBarTexture(s.barTexture) end
+
+  if s.fontSize then
+    local font = (GameFontHighlightSmall and GameFontHighlightSmall:GetFont()) or (STANDARD_TEXT_FONT or nil)
+    if font then
+      row.bar.playerText:SetFont(font, s.fontSize)
+      row.bar.timerText:SetFont(font, s.fontSize)
+    end
+  end
+
+  -- Position bar/icon selon préférence
+  row.bar:ClearAllPoints()
+  row.icon:ClearAllPoints()
+  if s.iconOnRight then
+    row.bar:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row.icon:SetPoint("LEFT", row.bar, "RIGHT", 4, 0)
+  else
+    row.icon:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row.bar:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
+  end
+end
+
+-- Réapplique le style à toutes les rows et repositionne selon l'espacement et la croissance
+function RCDT.ApplyStyleUI()
+  local s = (RCDT.GetStyle and RCDT.GetStyle()) or {}
+  local spacing = s.rowSpacing or 0
+  local growUp  = not not s.growUp
+
+  for i,row in ipairs(rowPool) do
+    if row then
+      RCDT.ApplyStyleToRow(row)
+      row:ClearAllPoints()
+      if i == 1 then
+        if growUp then
+          row:SetPoint("BOTTOMLEFT", 0, 0)
+        else
+          row:SetPoint("TOPLEFT", 0, 0)
+        end
+      else
+        if growUp then
+          row:SetPoint("BOTTOMLEFT", rowPool[i-1], "TOPLEFT", 0, spacing)
+        else
+          row:SetPoint("TOPLEFT", rowPool[i-1], "BOTTOMLEFT", 0, -spacing)
+        end
+      end
+    end
+  end
+  if RCDT.UpdateUI then RCDT.UpdateUI() end
+end

@@ -18,11 +18,9 @@ Logic/40_Network.lua
 UI/44_Widgets.lua
 UI/45_Display.lua
 UI/46_Filters.lua
+UI/47_Style.lua
 UI/50_UI.lua
-UI/54_OptionHelpers.lua
-UI/55_ConfigPopup.lua
-UI/56_FilterPopup.lua
-UI/57_BlizzardOptions.lua              
+UI/60_AceConfig.lua
 
 Core/90_Events.lua
 Core/99_Slash.lua

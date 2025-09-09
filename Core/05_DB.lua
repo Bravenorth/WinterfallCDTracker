@@ -12,6 +12,22 @@ RCDT.defaults = {
     scale  = 1.0,
     tick   = 0.10,          -- fréquence de refresh UI (s)
     pos    = nil,           -- {point, relPoint, x, y}
+    style  = {
+      rowHeight = 18,
+      rowSpacing = 0,
+      iconSize = 18,
+      barWidth = 220,
+      barTexture = "Interface\\TARGETINGFRAME\\UI-StatusBar",
+      fontSize = 11,
+      showTimer = true,
+      showPlayer = true,
+      iconOnRight = false,
+      growUp = false,
+      useClassColorWhenReady = true,
+      readyColor = { r = 0.2, g = 0.8, b = 0.2 },
+      activeColor = { r = 0.0, g = 0.7, b = 1.0 },
+      onCDColor   = { r = 1.0, g = 0.0, b = 0.0 },
+    },
   },
 }
 
@@ -70,4 +86,5 @@ function RCDT.ApplyConfigUI()
   if RCDT.StartUITicker then
     RCDT.StartUITicker(ui.tick or 0.10)
   end
+  if RCDT.ApplyStyleUI then RCDT.ApplyStyleUI() end
 end
