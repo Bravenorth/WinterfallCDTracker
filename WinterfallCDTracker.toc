@@ -19,8 +19,12 @@ UI/44_Widgets.lua
 UI/45_Display.lua
 UI/46_Filters.lua
 UI/47_Style.lua
-UI/50_UI.lua
+UI/50_Frame.lua
+UI/51_Rows.lua
+UI/52_Render.lua
+UI/55_Ticker.lua
 UI/60_AceConfig.lua
 
 Core/90_Events.lua
 Core/99_Slash.lua
+
