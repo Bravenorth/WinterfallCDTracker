@@ -3,6 +3,58 @@
 
 local RCDT = RaidCDTracker
 
+-- UTF-8 helpers to safely truncate text by characters
+local function utf8_char_len(b)
+  if not b then return 0 end
+  if b < 0x80 then return 1 elseif b < 0xE0 then return 2 elseif b < 0xF0 then return 3 else return 4 end
+end
+
+local function utf8_prefix(s, n)
+  if not s or n <= 0 then return "" end
+  local i, taken = 1, 0
+  local len = #s
+  while i <= len and taken < n do
+    local b = s:byte(i)
+    local step = utf8_char_len(b)
+    i = i + step
+    taken = taken + 1
+  end
+  return s:sub(1, i - 1)
+end
+
+local function setTruncated(fs, owner, cacheKey, rawText, maxWidth)
+  if not fs then return end
+  rawText = rawText or ""
+  if not maxWidth or maxWidth <= 0 then fs:SetText(rawText); return end
+  owner[cacheKey] = owner[cacheKey] or {}
+  local cache = owner[cacheKey]
+  if cache.raw == rawText and cache.w == maxWidth then
+    fs:SetText(cache.out or rawText)
+    return
+  end
+  fs:SetText(rawText)
+  if fs:GetStringWidth() <= maxWidth then
+    cache.raw, cache.w, cache.out = rawText, maxWidth, rawText
+    return
+  end
+  -- Iteratively trim until it fits, adding ellipsis
+  local ell = "..."
+  local left, right = 1, #rawText -- fallback bounds in bytes
+  -- Start with a rough cut at half the characters to reduce loops
+  local cut = math.max(1, math.floor(#rawText / 2))
+  local attempt = utf8_prefix(rawText, cut)
+  fs:SetText(attempt .. ell)
+  -- Refine by trimming one char at a time
+  while fs:GetStringWidth() > maxWidth and #attempt > 0 do
+    cut = cut - 1
+    attempt = utf8_prefix(rawText, cut)
+    fs:SetText(attempt .. ell)
+  end
+  local out = (attempt ~= rawText) and (attempt .. ell) or rawText
+  cache.raw, cache.w, cache.out = rawText, maxWidth, out
+  fs:SetText(out)
+end
+
 -- Mise à jour UI (les filtres ne touchent QUE l’affichage)
 function RCDT.UpdateUI()
   if not (RCDT.ShouldDisplayUI and RCDT.ShouldDisplayUI()) then
@@ -69,7 +121,8 @@ function RCDT.UpdateUI()
             row.cd:Show()
 
             do
-              local fs = (style.icons and (style.icons.timerFontSize or style.icons.fontSize)) or style.fontSize or 11
+              -- Use label font size for top/bottom spacing, not timer font size
+              local fs = (style.icons and style.icons.fontSize) or style.fontSize or 11
               local topExtra = ((style.icons and style.icons.showSpellName) and (fs + 2)) or 0
               row.icon:ClearAllPoints()
               row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -topExtra)
@@ -100,16 +153,17 @@ function RCDT.UpdateUI()
 
             local showTop = not not (style.icons and style.icons.showSpellName)
             local showBottom = not not (style.icons and style.icons.showPlayerName)
+            local iconSize = (style.icons and style.icons.size) or 18
+            local maxW = math.max(4, iconSize - 2)
             if showTop then
               local n = GetSpellInfo(spellID) or ""
-              row.nameTop:SetText(n)
+              setTruncated(row.nameTop, row, "_cacheTop", n, maxW)
             else
               row.nameTop:SetText("")
             end
             if showBottom then
-              if row.nameBottom and row.nameBottom.SetText then
-                row.nameBottom:SetText(RCDT.ShortName(player) or "")
-              end
+              local p = RCDT.ShortName(player) or ""
+              setTruncated(row.nameBottom, row, "_cacheBottom", p, maxW)
             else
               row.nameBottom:SetText("")
             end
@@ -120,7 +174,7 @@ function RCDT.UpdateUI()
             if row.cd.SetHideCountdownNumbers then
               row.cd:SetHideCountdownNumbers((not useNumbers) or (style.showTimer == false))
             end
-            if not useNumbers and (style.showTimer ~= false) then
+            if (style.showTimer ~= false) and (not useNumbers) then
               local r = remain or 0
               local txt
               if r >= 60 then
@@ -221,7 +275,8 @@ function RCDT.UpdateUI()
       if style.displayMode == "icons" then
         row.bar:Hide(); row.icon:Show(); row.cd:Show()
         do
-          local fs = (style.icons and (style.icons.timerFontSize or style.icons.fontSize)) or style.fontSize or 11
+          -- Use label font size for spacing
+          local fs = (style.icons and style.icons.fontSize) or style.fontSize or 11
           local topExtra = ((style.icons and style.icons.showSpellName) and (fs + 2)) or 0
           row.icon:ClearAllPoints(); row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -topExtra)
           row.nameTop:ClearAllPoints(); row.nameBottom:ClearAllPoints()
@@ -231,18 +286,54 @@ function RCDT.UpdateUI()
         row.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
         if statusIdx == 0 then
           if row.cd.Clear then row.cd:Clear() end
-          row.nameTop:SetText((style.icons and style.icons.showSpellName) and "Spell" or "")
-          row.nameBottom:SetText((style.icons and style.icons.showPlayerName) and ("Player" .. n) or "")
+          if (style.icons and style.icons.showSpellName) then
+            local iconSize = (style.icons and style.icons.size) or 18
+            local maxW = math.max(4, iconSize - 2)
+            setTruncated(row.nameTop, row, "_cacheTop", "Spell", maxW)
+          else
+            row.nameTop:SetText("")
+          end
+          if (style.icons and style.icons.showPlayerName) then
+            local iconSize = (style.icons and style.icons.size) or 18
+            local maxW = math.max(4, iconSize - 2)
+            setTruncated(row.nameBottom, row, "_cacheBottom", ("Player" .. n), maxW)
+          else
+            row.nameBottom:SetText("")
+          end
         elseif statusIdx == 1 then
           local dur = 15; local start = now - ((n * 1.1) % dur)
           row.cd:SetCooldown(start, dur)
-          row.nameTop:SetText((style.icons and style.icons.showSpellName) and "Active" or "")
-          row.nameBottom:SetText((style.icons and style.icons.showPlayerName) and ("Player" .. n) or "")
+          if (style.icons and style.icons.showSpellName) then
+            local iconSize = (style.icons and style.icons.size) or 18
+            local maxW = math.max(4, iconSize - 2)
+            setTruncated(row.nameTop, row, "_cacheTop", "Active", maxW)
+          else
+            row.nameTop:SetText("")
+          end
+          if (style.icons and style.icons.showPlayerName) then
+            local iconSize = (style.icons and style.icons.size) or 18
+            local maxW = math.max(4, iconSize - 2)
+            setTruncated(row.nameBottom, row, "_cacheBottom", ("Player" .. n), maxW)
+          else
+            row.nameBottom:SetText("")
+          end
         else
           local dur = 120; local start = now - ((n * 5.7) % dur)
           row.cd:SetCooldown(start, dur)
-          row.nameTop:SetText((style.icons and style.icons.showSpellName) and "Cooldown" or "")
-          row.nameBottom:SetText((style.icons and style.icons.showPlayerName) and ("Player" .. n) or "")
+          if (style.icons and style.icons.showSpellName) then
+            local iconSize = (style.icons and style.icons.size) or 18
+            local maxW = math.max(4, iconSize - 2)
+            setTruncated(row.nameTop, row, "_cacheTop", "Cooldown", maxW)
+          else
+            row.nameTop:SetText("")
+          end
+          if (style.icons and style.icons.showPlayerName) then
+            local iconSize = (style.icons and style.icons.size) or 18
+            local maxW = math.max(4, iconSize - 2)
+            setTruncated(row.nameBottom, row, "_cacheBottom", ("Player" .. n), maxW)
+          else
+            row.nameBottom:SetText("")
+          end
         end
         if row.cd.SetHideCountdownNumbers then
           local useNumbers = not ((style.icons and style.icons.useNumbers) == false)

@@ -113,6 +113,17 @@ function RCDT.ApplyStyleToRow(row)
     row.icon:SetSize(iconSize, iconSize)
     row.icon:ClearAllPoints()
     row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -topExtra)
+    -- Constrain label widths to icon, disable wrapping and center
+    if row.nameTop then
+      row.nameTop:SetWidth(iconSize)
+      row.nameTop:SetJustifyH("CENTER")
+      if row.nameTop.SetWordWrap then row.nameTop:SetWordWrap(false) end
+    end
+    if row.nameBottom then
+      row.nameBottom:SetWidth(iconSize)
+      row.nameBottom:SetJustifyH("CENTER")
+      if row.nameBottom.SetWordWrap then row.nameBottom:SetWordWrap(false) end
+    end
     row.bar:Hide()
     local fsz = (s.icons and s.icons.fontSize) or s.fontSize
     if fsz then
@@ -124,6 +135,8 @@ function RCDT.ApplyStyleToRow(row)
         row.iconTimerText:SetFont(font, math.max(8, tfs))
       end
     end
+    -- Invalidate truncation caches (font/size changed)
+    row._cacheTop, row._cacheBottom = nil, nil
     return
   end
 
@@ -150,6 +163,8 @@ function RCDT.ApplyStyleToRow(row)
     row.icon:SetPoint("LEFT", row, "LEFT", 0, 0)
     row.bar:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
   end
+  -- Invalidate truncation caches (font/size changed)
+  row._cacheTop, row._cacheBottom = nil, nil
 end
 
 -- Reapply style to all rows and reposition according to spacing/growth

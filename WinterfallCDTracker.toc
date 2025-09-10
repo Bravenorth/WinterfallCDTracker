@@ -1,8 +1,8 @@
 ## Interface: 50500
-## Title: RaidCDTracker
+## Title: Winterfall - Raid CD Tracker
 ## Author: Bravenorth
-## Version: 1.0.0
-## Notes: Suivi des cooldowns de raid (MoP Classic)
+## Version: 1.1.0
+## Notes: Winterfall raid cd tracker by Bravenorth
 ## SavedVariables: RaidCDTrackerDB
 
 Core/00_Init.lua

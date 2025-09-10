@@ -127,9 +127,12 @@ local function BuildTab_Style(container)
       function() return s.icons.fontSize or s.fontSize or 11 end,
       function(v) s.icons.fontSize = v; if RCDT.ApplyStyleUI then RCDT.ApplyStyleUI() end end)
 
-    addSlider(grpIcons, "Timer font size", 8, 24, 1,
+    local slTimer = addSlider(grpIcons, "Timer font size", 8, 24, 1,
       function() return s.icons.timerFontSize or s.icons.fontSize or s.fontSize or 11 end,
       function(v) s.icons.timerFontSize = v; if RCDT.ApplyStyleUI then RCDT.ApplyStyleUI() end end)
+    local lblTimerInfo = AceGUI:Create("Label"); lblTimerInfo:SetFullWidth(true)
+    lblTimerInfo:SetText("Note: built-in numbers cannot be resized. Uncheck to use custom text size.")
+    grpIcons:AddChild(lblTimerInfo)
     addCheckbox(grpIcons, "Spell name (above)",
       function() return s.icons.showSpellName == true end,
       function(v) s.icons.showSpellName = v; if RCDT.ApplyStyleUI then RCDT.ApplyStyleUI() end end)
@@ -138,7 +141,14 @@ local function BuildTab_Style(container)
       function(v) s.icons.showPlayerName = v; if RCDT.ApplyStyleUI then RCDT.ApplyStyleUI() end end)
     addCheckbox(grpIcons, "Use built-in numbers",
       function() return s.icons.useNumbers ~= false end,
-      function(v) s.icons.useNumbers = v; if RCDT.ApplyStyleUI then RCDT.ApplyStyleUI() end end)
+      function(v)
+        s.icons.useNumbers = v
+        if slTimer and slTimer.SetDisabled then slTimer:SetDisabled(v and true or false) end
+        if lblTimerInfo and lblTimerInfo.frame and lblTimerInfo.frame.Show and lblTimerInfo.frame.Hide then
+          if v then lblTimerInfo.frame:Show() else lblTimerInfo.frame:Hide() end
+        end
+        if RCDT.ApplyStyleUI then RCDT.ApplyStyleUI() end
+      end)
     addCheckbox(grpIcons, "Desaturate icon on cooldown",
       function() return s.icons.desaturateOnCD ~= false end,
       function(v) s.icons.desaturateOnCD = v; if RCDT.ApplyStyleUI then RCDT.ApplyStyleUI() end end)
@@ -148,6 +158,10 @@ local function BuildTab_Style(container)
     local cbBorder = addCheckbox(grpIcons, "Show colored border",
       function() return s.icons.border == true end,
       function(v) s.icons.border = v; if RCDT.ApplyStyleUI then RCDT.ApplyStyleUI() end end)
+    if slTimer and slTimer.SetDisabled then slTimer:SetDisabled(s.icons.useNumbers ~= false) end
+    if lblTimerInfo and lblTimerInfo.frame and lblTimerInfo.frame.Show and lblTimerInfo.frame.Hide then
+      if s.icons.useNumbers ~= false then lblTimerInfo.frame:Show() else lblTimerInfo.frame:Hide() end
+    end
     if slBorder and slBorder.SetDisabled then slBorder:SetDisabled(not (s.icons.border == true)) end
   end
 

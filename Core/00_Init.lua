@@ -5,7 +5,7 @@ RaidCDTracker = RaidCDTracker or {}
 local RCDT = RaidCDTracker
 
 -- Métadonnées / flags
-RCDT.ADDON       = "RaidCDTracker"
+RCDT.ADDON       = "WinterfallRaidCDTracker"
 RCDT.VERSION     = 3         -- v3: ajoute activeDur au protocole
 RCDT.DEBUG_MODE  = false
 
