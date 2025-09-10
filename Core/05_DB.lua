@@ -21,7 +21,7 @@ RCDT.defaults = {
       -- Barres
       rowHeight = 18,
       rowSpacing = 0,
-      iconSize = 18,
+      barIconSize = 18,
       barWidth = 220,
       barTexture = "Interface\\TARGETINGFRAME\\UI-StatusBar",
       fontSize = 11,
@@ -34,16 +34,19 @@ RCDT.defaults = {
       activeColor = { r = 0.0, g = 0.7, b = 1.0 },
       onCDColor   = { r = 1.0, g = 0.0, b = 0.0 },
 
-      -- Icônes
-      iconColumns = 8,            -- nb de colonnes pour la grille
-      iconSpacing = 4,            -- espace entre icônes (h/v)
-      iconShowSpellName = false,  -- nom du sort (au-dessus)
-      iconShowPlayerName = false, -- nom du joueur (en-dessous)
-      iconUseNumbers = true,      -- utiliser les chiffres intégrés du cooldown
-      iconFontSize = 11,          -- taille de police des libellés icône
-      iconDesaturateOnCD = true,  -- désaturer l'icône en recharge
-      iconBorder = false,         -- afficher une bordure colorée
-      iconBorderSize = 1,         -- épaisseur de bordure
+      -- Icons (icon-only mode)
+      icons = {
+        size = 18,
+        columns = 8,
+        spacing = 4,
+        showSpellName = false,
+        showPlayerName = false,
+        useNumbers = true,
+        fontSize = 11,
+        desaturateOnCD = true,
+        border = false,
+        borderSize = 1,
+      },
     },
   },
 }
@@ -105,3 +108,4 @@ function RCDT.ApplyConfigUI()
   end
   if RCDT.ApplyStyleUI then RCDT.ApplyStyleUI() end
 end
+

@@ -4,34 +4,7 @@
 local RCDT = RaidCDTracker
 local UI_PERIOD = 0.10  -- tick fixe pour l'UI
 
--- Helpers display
-local function EnsureDisplayDefaults()
-  if not RCDT.db then return end
-  RCDT.db.display = RCDT.db.display or {}
-  local d = RCDT.db.display
-  if d.instance == nil then d.instance = true end
-  if d.raid     == nil then d.raid     = true end
-  if d.party    == nil then d.party    = true end
-  if d.solo     == nil then d.solo     = true end
-end
-
-local function GetDisplayContext()
-  local inInstance = IsInInstance()     -- bool (premier retour)
-  if inInstance then return "instance" end
-  if IsInRaid() then return "raid" end
-  if IsInGroup() then return "party" end
-  return "solo"
-end
-
-local function ShouldDisplayUI()
-  if not RCDT.db then return true end        -- avant DBInit: on affiche
-  EnsureDisplayDefaults()
-  local ctx = GetDisplayContext()
-  local d = RCDT.db.display
-  local v = d and d[ctx]
-  if v == nil then return true end           -- fallback sécurité
-  return v
-end
+-- Display helpers centralized in UI/45_Display.lua (RCDT.ShouldDisplayUI)
 
 -- Fenêtre principale
 RCDT.ui = CreateFrame("Frame", "RaidCDTrackerUIFrame", UIParent)
@@ -117,7 +90,7 @@ local function GetRow(i)
 end
 
 -- Couleurs (par statut)
-local STATUS_COLORS = { [1]={0,0.7,1}, [2]={1,0,0} }
+-- STATUS_COLORS unused
 
 -- Mise à jour UI (les filtres ne touchent QUE l’affichage)
 function RCDT.UpdateUI()
@@ -546,6 +519,8 @@ function RCDT.ApplyStyleUI()
   end
   if RCDT.UpdateUI then RCDT.UpdateUI() end
 end
+
+
 
 
 
