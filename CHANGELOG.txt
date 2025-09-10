@@ -1,0 +1,13 @@
+Winterfall - Raid CD Tracker
+
+Version 1.1.0-beta (2025-09-10)
+ - Beta release for MoP Classic (Interface 50500)
+ - Added Icons display mode (size, columns, spacing, labels, timer numbers)
+ - Improved Bars mode (class color when ready, texture presets, font sizing)
+ - Per-class spell filters with AceGUI (persisted to SavedVariables)
+ - Network protocol v3: includes activeDur for accurate Active status
+ - Roster maintenance and Name vs Name-Realm canonicalization
+ - Slash commands: /raidcd config | filters | dump | lock | unlock | debug on|off
+ - SavedVariables: RaidCDTrackerDB (frame position, style, filters, debug)
+ - UI ticking and UTF-8 safe text truncation improvements
+

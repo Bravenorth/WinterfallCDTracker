@@ -1,7 +1,7 @@
 ## Interface: 50500
-## Title: Winterfall - Raid CD Tracker
+## Title: Winterfall - Raid CD Tracker -beta
 ## Author: Bravenorth
-## Version: 1.1.0
+## Version: 1.1.0-beta
 ## Notes: Winterfall raid cd tracker by Bravenorth
 ## SavedVariables: RaidCDTrackerDB
 
@@ -27,4 +27,3 @@ UI/60_AceConfig.lua
 
 Core/90_Events.lua
 Core/99_Slash.lua
-
