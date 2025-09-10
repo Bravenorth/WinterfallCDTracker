@@ -13,6 +13,12 @@ RCDT.defaults = {
     tick   = 0.10,          -- fréquence de refresh UI (s)
     pos    = nil,           -- {point, relPoint, x, y}
     style  = {
+      -- Preview / edit mode
+      editMode = false,
+      -- Mode d'affichage
+      displayMode = "bars", -- "bars" ou "icons"
+
+      -- Barres
       rowHeight = 18,
       rowSpacing = 0,
       iconSize = 18,
@@ -27,6 +33,17 @@ RCDT.defaults = {
       readyColor = { r = 0.2, g = 0.8, b = 0.2 },
       activeColor = { r = 0.0, g = 0.7, b = 1.0 },
       onCDColor   = { r = 1.0, g = 0.0, b = 0.0 },
+
+      -- Icônes
+      iconColumns = 8,            -- nb de colonnes pour la grille
+      iconSpacing = 4,            -- espace entre icônes (h/v)
+      iconShowSpellName = false,  -- nom du sort (au-dessus)
+      iconShowPlayerName = false, -- nom du joueur (en-dessous)
+      iconUseNumbers = true,      -- utiliser les chiffres intégrés du cooldown
+      iconFontSize = 11,          -- taille de police des libellés icône
+      iconDesaturateOnCD = true,  -- désaturer l'icône en recharge
+      iconBorder = false,         -- afficher une bordure colorée
+      iconBorderSize = 1,         -- épaisseur de bordure
     },
   },
 }

@@ -25,6 +25,7 @@ end
 
 -- Faut-il afficher la fenêtre en fonction du contexte ?
 function RCDT.ShouldDisplayUI()
+  if (RCDT.IsEditEnabled and RCDT.IsEditEnabled()) then return true end
   if not RCDT.db then return true end -- avant DBInit: afficher
   RCDT.DisplayEnsureDefaults()
   local ctx = RCDT.GetDisplayContext()
@@ -33,4 +34,3 @@ function RCDT.ShouldDisplayUI()
   if v == nil then return true end
   return v
 end
-
