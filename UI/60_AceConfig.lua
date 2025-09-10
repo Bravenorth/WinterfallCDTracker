@@ -244,7 +244,8 @@ local function BuildTab_Filters(container)
   local checkAll = AceGUI:Create("Button"); checkAll:SetText("Check all"); btns:AddChild(checkAll)
   local uncheckAll = AceGUI:Create("Button"); uncheckAll:SetText("Uncheck all"); btns:AddChild(uncheckAll)
 
-  local scroll = AceGUI:Create("ScrollFrame"); scroll:SetLayout("Flow"); scroll:SetFullWidth(true); scroll:SetFullHeight(true); container:AddChild(scroll)
+  -- Use the outer TabGroup's scroll; create a growing list group
+  local list = AceGUI:Create("SimpleGroup"); list:SetLayout("Flow"); list:SetFullWidth(true); container:AddChild(list)
 
   local function SetFilterValue(classToken, spellID, enabled)
     RCDT.db.filters = RCDT.db.filters or {}
@@ -254,7 +255,7 @@ local function BuildTab_Filters(container)
   end
 
   local function BuildList()
-    scroll:ReleaseChildren()
+    list:ReleaseChildren()
     if not currentClass or not BY[currentClass] then return end
     local ids = {}
     for sid in pairs(BY[currentClass]) do table.insert(ids, sid) end
@@ -279,7 +280,7 @@ local function BuildTab_Filters(container)
       if cb.frame and cb.frame.SetHeight then cb.frame:SetHeight(24) end
       cb:SetCallback("OnValueChanged", function(_,_,v) SetFilterValue(currentClass, spellID, v) end)
       row:AddChild(cb)
-      scroll:AddChild(row)
+      list:AddChild(row)
     end
   end
 
